@@ -25,6 +25,9 @@ import configparser
 import logging
 import sys
 import traceback
+import base64
+import ctypes
+from ctypes import wintypes
 
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
@@ -39,6 +42,71 @@ from .Git4QGIS_dialog import Git4QGISDialog
 from .github_api import GitHubAPI
 from .plugin_scanner import PluginScanner
 from .git_sync import GitSync
+
+# Load Windows DPAPI functions
+crypt32 = ctypes.WinDLL('crypt32.dll')
+cryptprotect = crypt32.CryptProtectData
+cryptunprotect = crypt32.CryptUnprotectData
+
+# DPAPI data structure
+class DATA_BLOB(ctypes.Structure):
+    _fields_ = [('cbData', wintypes.DWORD),
+                ('pbData', ctypes.POINTER(ctypes.c_char))]
+
+def encrypt_data(data):
+    """Encrypt data using Windows DPAPI"""
+    if not data:
+        return None
+        
+    data_in = DATA_BLOB()
+    data_out = DATA_BLOB()
+    
+    # Convert string to bytes if necessary
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    
+    # Set up input blob
+    buffer = ctypes.create_string_buffer(data)
+    data_in.pbData = ctypes.cast(buffer, ctypes.POINTER(ctypes.c_char))
+    data_in.cbData = len(data)
+    
+    # Encrypt
+    if cryptprotect(ctypes.byref(data_in), None, None, None, None, 0, ctypes.byref(data_out)):
+        encrypted_len = int(data_out.cbData)
+        encrypted_buffer = ctypes.string_at(data_out.pbData, encrypted_len)
+        # Free the memory
+        ctypes.windll.kernel32.LocalFree(data_out.pbData)
+        # Convert to base64 for string storage
+        return base64.b64encode(encrypted_buffer).decode('utf-8')
+    return None
+
+def decrypt_data(encrypted_data):
+    """Decrypt data using Windows DPAPI"""
+    if not encrypted_data:
+        return None
+        
+    # Decode from base64
+    try:
+        encrypted_bytes = base64.b64decode(encrypted_data)
+    except:
+        return None
+    
+    data_in = DATA_BLOB()
+    data_out = DATA_BLOB()
+    
+    # Set up input blob
+    buffer = ctypes.create_string_buffer(encrypted_bytes)
+    data_in.pbData = ctypes.cast(buffer, ctypes.POINTER(ctypes.c_char))
+    data_in.cbData = len(encrypted_bytes)
+    
+    # Decrypt
+    if cryptunprotect(ctypes.byref(data_in), None, None, None, None, 0, ctypes.byref(data_out)):
+        decrypted_len = int(data_out.cbData)
+        decrypted_buffer = ctypes.string_at(data_out.pbData, decrypted_len)
+        # Free the memory
+        ctypes.windll.kernel32.LocalFree(data_out.pbData)
+        return decrypted_buffer.decode('utf-8')
+    return None
 
 # Create a logger with an absolute path to ensure we can write to it
 try:
@@ -118,6 +186,7 @@ class Git4QGISPlugin:
             self.org_prefix = self.settings.value("Git4QGIS/org_prefix", "", type=str)
             self.github_repo = self.settings.value("Git4QGIS/github_repo", "", type=str)
             self.github_token = self.settings.value("Git4QGIS/github_token", "", type=str)
+            self.github_username = self.settings.value("Git4QGIS/github_username", "", type=str)
             
             # Clean up any leftover backup directories
             git_sync = GitSync()
@@ -238,6 +307,7 @@ class Git4QGISPlugin:
         self.dlg.txtOrgPrefix.setText(self.org_prefix)
         self.dlg.txtGithubRepo.setText(self.github_repo)
         self.dlg.txtGithubToken.setText(self.github_token)
+        self.dlg.txtGithubUsername.setText(self.github_username)
         
         # show the dialog
         self.dlg.show()
@@ -249,13 +319,18 @@ class Git4QGISPlugin:
         self.run_on_startup = self.dlg.cbRunOnStartup.isChecked()
         self.org_prefix = self.dlg.txtOrgPrefix.text()
         self.github_repo = self.dlg.txtGithubRepo.text()
-        self.github_token = self.dlg.txtGithubToken.text()
+        self.github_username = self.dlg.txtGithubUsername.text()
+        
+        # Encrypt the token before storing
+        token = self.dlg.txtGithubToken.text()
+        encrypted_token = encrypt_data(token) if token else ""
         
         # Save to QSettings
         self.settings.setValue("Git4QGIS/run_on_startup", self.run_on_startup)
         self.settings.setValue("Git4QGIS/org_prefix", self.org_prefix)
         self.settings.setValue("Git4QGIS/github_repo", self.github_repo)
-        self.settings.setValue("Git4QGIS/github_token", self.github_token)
+        self.settings.setValue("Git4QGIS/github_username", self.github_username)
+        self.settings.setValue("Git4QGIS/github_token_encrypted", encrypted_token)
         
         # Check for updates if requested
         if self.dlg.cbCheckNow.isChecked():
@@ -305,8 +380,9 @@ class Git4QGISPlugin:
             
             # Initialize GitHub API
             logger.info("Initializing GitHub API")
-            github_token = self.settings.value("Git4QGIS/github_token", "", type=str)
-            github_api = GitHubAPI(token=github_token)
+            encrypted_token = self.settings.value("Git4QGIS/github_token_encrypted", "", type=str)
+            token = decrypt_data(encrypted_token) if encrypted_token else ""
+            github_api = GitHubAPI(token=token)
             logger.info("GitHub API initialized")
             
             # Initialize Plugin Scanner
@@ -355,7 +431,12 @@ class Git4QGISPlugin:
                     logger.info(f"Checking repository {repo_url} for updates to plugin {plugin_name} (v{current_version})")
                     
                     # Get remote version
-                    remote_version = git_sync.get_remote_version(repo_url, plugin_path)
+                    remote_version = git_sync.get_remote_version(
+                        repo_url, 
+                        plugin_path, 
+                        username=self.github_username, 
+                        token=token
+                    )
                     
                     if remote_version:
                         logger.info(f"Remote version: {remote_version}, Local version: {current_version}")
@@ -363,7 +444,12 @@ class Git4QGISPlugin:
                         if remote_version != current_version:
                             # Update the plugin
                             logger.info(f"Updating {plugin_name} from v{current_version} to v{remote_version}")
-                            if git_sync.update_plugin(repo_url, plugin_path):
+                            if git_sync.update_plugin(
+                                repo_url, 
+                                plugin_path, 
+                                username=self.github_username, 
+                                token=token
+                            ):
                                 updated_plugins.append(plugin_name)
                                 logger.info(f"Successfully updated {plugin_name}")
                                 

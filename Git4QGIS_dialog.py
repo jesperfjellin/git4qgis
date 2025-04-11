@@ -23,7 +23,7 @@
 import os
 
 from qgis.PyQt import uic
-from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QDialogButtonBox
+from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QDialogButtonBox, QGroupBox
 
 class Git4QGISDialog(QDialog):
     def __init__(self, parent=None):
@@ -56,12 +56,34 @@ class Git4QGISDialog(QDialog):
         self.cbCheckNow = QCheckBox("Check for updates now")
         self.layout.addWidget(self.cbCheckNow)
         
-        # GitHub Token
-        self.layout.addWidget(QLabel("GitHub Token (optional):"))
+        # GitHub Authentication Group
+        authGroup = QGroupBox("GitHub Authentication (for private repositories)")
+        authLayout = QVBoxLayout()
+        
+        # GitHub Username
+        authLayout.addWidget(QLabel("GitHub Username:"))
+        self.txtGithubUsername = QLineEdit()
+        self.txtGithubUsername.setPlaceholderText("Your GitHub username")
+        authLayout.addWidget(self.txtGithubUsername)
+        
+        # Replace the existing GitHub Token section with:
+        tokenLabel = QLabel("Fine-grained Personal Access Token:")
+        authLayout.addWidget(tokenLabel)
         self.txtGithubToken = QLineEdit()
-        self.txtGithubToken.setPlaceholderText("Personal access token for private repositories")
+        self.txtGithubToken.setPlaceholderText("PAT for private repositories")
         self.txtGithubToken.setEchoMode(QLineEdit.Password)
-        self.layout.addWidget(self.txtGithubToken)
+        authLayout.addWidget(self.txtGithubToken)
+        
+        # Add token help text
+        tokenHelp = QLabel(
+            "Create a token at: github.com/settings/tokens?type=beta\n"
+            "Required permissions: Contents (read-only)"
+        )
+        tokenHelp.setWordWrap(True)
+        authLayout.addWidget(tokenHelp)
+        
+        authGroup.setLayout(authLayout)
+        self.layout.addWidget(authGroup)
         
         # Button box
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)

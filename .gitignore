@@ -1,10 +1,4 @@
-# Python-generated files
+.cursor/
+.history/
 __pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
+git4qgis_log.txt
