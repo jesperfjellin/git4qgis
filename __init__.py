@@ -5,9 +5,9 @@
                                  A QGIS plugin
  Automatically sync QGIS plugins with GitHub repositories
                              -------------------
-        begin                : 2023
-        copyright            : (C) 2023
-        email                : your.email@example.com
+        begin                : 2025
+        copyright            : (C) 2025
+        email                : jesperfjellin@gmail.com
  ***************************************************************************/
 
 /***************************************************************************
