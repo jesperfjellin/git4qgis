@@ -21,7 +21,6 @@
 """
 
 import os.path
-import configparser
 import logging
 import sys
 import traceback
@@ -31,13 +30,10 @@ from ctypes import wintypes
 
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QMessageBox
-from qgis.core import Qgis, QgsApplication
-from qgis.utils import reloadPlugin, loadPlugin, unloadPlugin, updateAvailablePlugins
+from qgis.PyQt.QtWidgets import QAction
+from qgis.core import Qgis
+from qgis.utils import loadPlugin, unloadPlugin, updateAvailablePlugins
 
-# Initialize Qt resources from file resources.py
-# from .resources import *
-# Import the code for the dialog
 from .Git4QGIS_dialog import Git4QGISDialog
 from .github_api import GitHubAPI
 from .plugin_scanner import PluginScanner

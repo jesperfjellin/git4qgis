@@ -1,4 +1,4 @@
-<img src="img/icon.png" alt="Logo" width="220"/>
+<img src="icon.png" alt="Logo" width="220"/>
 
 # About
 
