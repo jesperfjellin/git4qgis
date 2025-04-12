@@ -23,7 +23,7 @@
 import os
 
 from qgis.PyQt import uic
-from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QDialogButtonBox, QGroupBox
+from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QDialogButtonBox, QGroupBox, QPushButton, QHBoxLayout, QFileDialog
 
 class Git4QGISDialog(QDialog):
     def __init__(self, parent=None):
@@ -85,6 +85,28 @@ class Git4QGISDialog(QDialog):
         authGroup.setLayout(authLayout)
         self.layout.addWidget(authGroup)
         
+        # Git Executable Path
+        self.layout.addWidget(QLabel("Git Executable Path:"))
+        self.txtGitPath = QLineEdit()
+        self.txtGitPath.setPlaceholderText(r"C:\Program Files\Git\bin\git.exe")
+        browse_button = QPushButton("Browse...")
+        browse_button.clicked.connect(self.browse_git_executable)
+        browse_layout = QHBoxLayout()
+        browse_layout.addWidget(self.txtGitPath)
+        browse_layout.addWidget(browse_button)
+        self.layout.addLayout(browse_layout)
+        
+        # Plugin Directory Path
+        self.layout.addWidget(QLabel("QGIS Plugin Directory:"))
+        self.txtPluginDir = QLineEdit()
+        self.txtPluginDir.setPlaceholderText(r"C:\OSGeo4W\apps\qgis\python\plugins")
+        plugin_browse_button = QPushButton("Browse...")
+        plugin_browse_button.clicked.connect(self.browse_plugin_directory)
+        plugin_browse_layout = QHBoxLayout()
+        plugin_browse_layout.addWidget(self.txtPluginDir)
+        plugin_browse_layout.addWidget(plugin_browse_button)
+        self.layout.addLayout(plugin_browse_layout)
+        
         # Button box
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.buttonBox.accepted.connect(self.accept)
@@ -92,3 +114,24 @@ class Git4QGISDialog(QDialog):
         self.layout.addWidget(self.buttonBox)
         
         self.setLayout(self.layout)
+
+    def browse_git_executable(self):
+        """Open file dialog to select git executable"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Select Git Executable", 
+            "", 
+            "Executable Files (*.exe);;All Files (*)"
+        )
+        if file_path:
+            self.txtGitPath.setText(file_path)
+
+    def browse_plugin_directory(self):
+        """Open directory dialog to select plugin directory"""
+        dir_path = QFileDialog.getExistingDirectory(
+            self,
+            "Select QGIS Plugin Directory",
+            self.txtPluginDir.text() or r"C:\OSGeo4W\apps\qgis\python\plugins"
+        )
+        if dir_path:
+            self.txtPluginDir.setText(dir_path)

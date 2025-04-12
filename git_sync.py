@@ -16,10 +16,14 @@ logger = logging.getLogger('Git4QGIS')
 class GitSync:
     """Class to handle Git synchronization operations"""
     
-    def __init__(self):
-        """Initialize the Git synchronization handler"""
+    def __init__(self, custom_git_path=None):
+        """Initialize the Git synchronization handler
+        
+        Args:
+            custom_git_path (str): Optional custom path to git executable
+        """
         self.temp_dir = None
-        self.git_path = self._find_git_executable()
+        self.git_path = custom_git_path if custom_git_path else self._find_git_executable()
         logger.info(f"Initialized GitSync with git_path: {self.git_path}")
         
     def _execute_git_command(self, command, cwd=None, env=None):
@@ -96,24 +100,16 @@ class GitSync:
         """Find the Git executable path"""
         logger.info("Searching for Git executable")
         
-        # Try common Git installation paths on Windows
-        common_paths = [
-            r'C:\Program Files\Git\bin\git.exe',     # Common path
-            r'C:\Program Files\Git\cmd\git.exe',      # Alternative location
-            r'C:\Program Files (x86)\Git\bin\git.exe',
-            r'C:\Program Files (x86)\Git\cmd\git.exe',
-            os.path.expanduser(r'~\AppData\Local\Programs\Git\bin\git.exe'),
-        ]
+        # Try default Git installation path on Windows
+        default_path = r'C:\Program Files\Git\bin\git.exe'
         
-        # Check if each path exists
-        for path in common_paths:
-            logger.info(f"Checking for Git at: {path}")
-            if os.path.exists(path):
-                logger.info(f"Found Git at: {path}")
-                return path
+        # Check if the path exists
+        if os.path.exists(default_path):
+            logger.info(f"Found Git at: {default_path}")
+            return default_path
         
-        # If not found in common locations, return default
-        logger.warning("Git not found in common locations, defaulting to 'git'")
+        # If not found in default location, return 'git' for PATH lookup
+        logger.warning("Git not found at default location, defaulting to 'git'")
         return 'git'
         
     def clone_repository(self, url, branch='main', username=None, token=None):
@@ -135,38 +131,42 @@ class GitSync:
         print(f"Created temp directory: {self.temp_dir}")
         
         try:
-            # If authentication provided, modify the URL
-            if username and token:
-                # Parse the URL to insert credentials
-                if url.startswith('https://'):
-                    auth_url = url.replace('https://', f'https://{username}:{token}@')
-                    # Log that we're using authentication (but don't log the full URL with token)
-                    logger.info(f"Using authenticated URL for {url}")
-                else:
-                    auth_url = url
-                    logger.warning(f"Authentication provided but URL doesn't use HTTPS: {url}")
-            else:
+            # Set up environment variables for git credential helper
+            env = os.environ.copy()
+            if username and token and 'github.com' in url:
+                # Don't modify the URL - leave it as https://github.com/...
                 auth_url = url
                 
-            # Full git command for debugging (don't log auth_url to avoid exposing credentials)
+                # Set environment variables for Git credential helper
+                env['GIT_ASKPASS'] = 'echo'
+                env['GIT_TERMINAL_PROMPT'] = '0'
+                
+                # Create a credential helper script
+                helper_script = tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.bat')
+                if token.startswith('github_pat_'):
+                    # For Fine-grained PAT, use token as password
+                    helper_script.write(f'@echo {token}')
+                else:
+                    # For classic token, use token directly
+                    helper_script.write(f'@echo {token}')
+                helper_script.close()
+                
+                # Set the helper as the askpass program
+                env['GIT_ASKPASS'] = helper_script.name
+                logger.info(f"Using credential helper for authentication with {url}")
+            else:
+                auth_url = url
+            
+            # Git command for cloning
             git_cmd = ['git', 'clone', '--depth', '1', '--branch', branch, auth_url, self.temp_dir]
-            print(f"Running Git command: git clone --depth 1 --branch {branch} [REPO_URL] {self.temp_dir}")
             
-            # Set up environment variables for git credential helper if needed
-            env = None
-            if username and token and 'github.com' in url:
-                # Set git credential helper environment variables
-                credential = f"username={username}\npassword={token}\n"
-                credential_b64 = base64.b64encode(credential.encode('utf-8')).decode('utf-8')
-                env = {
-                    'GIT_ASKPASS': 'echo',
-                    'GIT_TERMINAL_PROMPT': '0',
-                    'GCM_CREDENTIAL': credential_b64
-                }
-            
-            # Execute with authentication
+            # Execute the command with the environment variables
             self._execute_git_command(git_cmd, env=env)
-            print(f"Clone successful to: {self.temp_dir}")
+            
+            # Clean up the helper script if it was created
+            if 'helper_script' in locals() and os.path.exists(helper_script.name):
+                os.unlink(helper_script.name)
+            
             return self.temp_dir
         except Exception as e:
             print(f"Clone failed: {str(e)}")

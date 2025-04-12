@@ -13,11 +13,12 @@ logger = logging.getLogger('Git4QGIS')
 class PluginScanner:
     """Class to scan for QGIS plugins matching an organization prefix"""
     
-    def __init__(self, org_prefix):
+    def __init__(self, org_prefix, custom_plugin_dir=None):
         """Initialize the plugin scanner
         
         Args:
             org_prefix (str): Organization prefix to match plugins against
+            custom_plugin_dir (str): Optional custom plugin directory
         """
         self.org_prefix = org_prefix
         
@@ -34,10 +35,15 @@ class PluginScanner:
         if os.path.exists(system_plugin_dir):
             self.plugin_dirs.append(system_plugin_dir)
         
-        # Add the directory where we know TestOrg_SimplePlugin is installed
-        osgeo_plugin_dir = r'C:\OSGeo4W\apps\qgis\python\plugins'
-        if os.path.exists(osgeo_plugin_dir) and osgeo_plugin_dir not in self.plugin_dirs:
-            self.plugin_dirs.append(osgeo_plugin_dir)
+        # Add custom plugin directory if provided
+        if custom_plugin_dir and os.path.exists(custom_plugin_dir):
+            if custom_plugin_dir not in self.plugin_dirs:
+                self.plugin_dirs.append(custom_plugin_dir)
+        else:
+            # Use default OSGeo directory as a fallback
+            default_plugin_dir = r'C:\OSGeo4W\apps\qgis\python\plugins'
+            if os.path.exists(default_plugin_dir) and default_plugin_dir not in self.plugin_dirs:
+                self.plugin_dirs.append(default_plugin_dir)
         
     def set_prefix(self, prefix):
         """Set the organization prefix

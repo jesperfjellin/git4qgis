@@ -187,6 +187,8 @@ class Git4QGISPlugin:
             self.github_repo = self.settings.value("Git4QGIS/github_repo", "", type=str)
             self.github_token = self.settings.value("Git4QGIS/github_token", "", type=str)
             self.github_username = self.settings.value("Git4QGIS/github_username", "", type=str)
+            self.git_path = self.settings.value("Git4QGIS/git_path", r"C:\Program Files\Git\bin\git.exe", type=str)
+            self.plugin_dir_path = self.settings.value("Git4QGIS/plugin_dir_path", r"C:\OSGeo4W\apps\qgis\python\plugins", type=str)
             
             # Clean up any leftover backup directories
             git_sync = GitSync()
@@ -308,6 +310,8 @@ class Git4QGISPlugin:
         self.dlg.txtGithubRepo.setText(self.github_repo)
         self.dlg.txtGithubToken.setText(self.github_token)
         self.dlg.txtGithubUsername.setText(self.github_username)
+        self.dlg.txtGitPath.setText(self.git_path)
+        self.dlg.txtPluginDir.setText(self.plugin_dir_path)
         
         # show the dialog
         self.dlg.show()
@@ -320,6 +324,8 @@ class Git4QGISPlugin:
         self.org_prefix = self.dlg.txtOrgPrefix.text()
         self.github_repo = self.dlg.txtGithubRepo.text()
         self.github_username = self.dlg.txtGithubUsername.text()
+        self.git_path = self.dlg.txtGitPath.text()
+        self.plugin_dir_path = self.dlg.txtPluginDir.text()
         
         # Encrypt the token before storing
         token = self.dlg.txtGithubToken.text()
@@ -331,6 +337,8 @@ class Git4QGISPlugin:
         self.settings.setValue("Git4QGIS/github_repo", self.github_repo)
         self.settings.setValue("Git4QGIS/github_username", self.github_username)
         self.settings.setValue("Git4QGIS/github_token_encrypted", encrypted_token)
+        self.settings.setValue("Git4QGIS/git_path", self.git_path)
+        self.settings.setValue("Git4QGIS/plugin_dir_path", self.plugin_dir_path)
         
         # Check for updates if requested
         if self.dlg.cbCheckNow.isChecked():
@@ -364,7 +372,7 @@ class Git4QGISPlugin:
             
             # Check if git is installed
             logger.info("Checking if Git is installed")
-            git_sync = GitSync()
+            git_sync = GitSync(custom_git_path=self.git_path)
             logger.info("GitSync initialized")
             
             if not git_sync.is_git_installed():
@@ -387,8 +395,8 @@ class Git4QGISPlugin:
             
             # Initialize Plugin Scanner
             logger.info("Initializing Plugin Scanner")
-            scanner = PluginScanner(self.org_prefix)
-            logger.info(f"Plugin Scanner initialized with prefix: {self.org_prefix}")
+            scanner = PluginScanner(self.org_prefix, custom_plugin_dir=self.plugin_dir_path)
+            logger.info(f"Plugin Scanner initialized with prefix: {self.org_prefix} and custom directory: {self.plugin_dir_path}")
             
             # Find plugins matching the prefix
             logger.info("Searching for matching plugins")
