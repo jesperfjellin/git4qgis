@@ -1,4 +1,7 @@
-# Git4QGIS
+<img src="icon.png" alt="Logo" width="220"/>
+
+# About
+
 
 Seamless Git integration for QGIS plugins, automatically updating your plugins from GitHub repositories when QGIS launches. Supports fine-grained personal access tokens for two-factor authentication, and Windows Data Protection API to encrypt the token.
 
