@@ -10,6 +10,8 @@ import shutil
 from datetime import datetime
 import logging
 import base64
+import subprocess
+import time
 
 logger = logging.getLogger('Git4QGIS')
 
@@ -82,9 +84,9 @@ class GitSync:
             return True
         except Exception as e:
             logger.error(f"Git check failed: {str(e)}")
-            # Second chance - try with explicit path
+
             try:
-                # Hardcode the path you confirmed exists
+                # Hardcode path
                 hardcoded_path = r'C:\Program Files\Git\bin\git.exe'
                 if os.path.exists(hardcoded_path):
                     self.git_path = hardcoded_path
@@ -134,7 +136,7 @@ class GitSync:
             # Set up environment variables for git credential helper
             env = os.environ.copy()
             if username and token and 'github.com' in url:
-                # Don't modify the URL - leave it as https://github.com/...
+
                 auth_url = url
                 
                 # Set environment variables for Git credential helper
@@ -316,7 +318,7 @@ class GitSync:
             
             logger.info(f"Using source directory: {source_dir}")
             
-            # IMPORTANT: Remove the old plugin directory first
+            # Remove the old plugin directory first
             logger.info(f"Removing old plugin at: {plugin_path}")
             self._safe_remove_directory(plugin_path)
             
@@ -363,8 +365,7 @@ class GitSync:
             
             try:
                 # Windows-specific approach for locked files
-                import subprocess
-                import time
+
                 
                 # Special handling for .git directory
                 git_dir = os.path.join(directory_path, '.git')
