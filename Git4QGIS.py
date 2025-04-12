@@ -426,9 +426,6 @@ class Git4QGISPlugin:
                 current_version = plugin['metadata'].get('version', '0.0.0')
                 
                 try:
-                    # CHANGE THIS PART
-                    # Don't add the plugin name to the repo URL
-                    # Just use the GitHub repo URL directly
                     repo_url = self.github_repo
                     
                     # Log what we're doing
