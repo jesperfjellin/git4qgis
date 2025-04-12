@@ -1,4 +1,4 @@
-<img src="icon.png" alt="Logo" width="220"/>
+<img src="img/icon.png" alt="Logo" width="220"/>
 
 # About
 
@@ -27,7 +27,7 @@ Step 3: Develop your plugins as usual, and push the changes to Github. Make sure
 - **QGIS Plugin Directory**: Custom plugin directory (default: C:\OSGeo4W\apps\qgis\python\plugins)
 - **Run on startup**: Enable to automatically check for updates when QGIS launches
 
-![Settings dialog](/how-to/dialog.png)
+![Settings dialog](/img/dialog.png)
 
 ## Security
 This plugin uses the Windows Data Protection API (DPAPI) to securely encrypt your GitHub token. The token is never stored in plain text and is only decrypted when needed for authentication.
