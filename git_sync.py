@@ -171,6 +171,54 @@ class GitSync:
         except Exception as e:
             print(f"Clone failed: {str(e)}")
             raise
+    
+    def _find_plugin_directory(self, temp_dir, plugin_name):
+        """Find the appropriate directory for a plugin in the repository
+        
+        Args:
+            temp_dir (str): Path to the temporary directory containing the cloned repo
+            plugin_name (str): Name of the plugin to find
+            
+        Returns:
+            str: Path to the plugin directory within the repo (or root if single plugin)
+        """
+        # First check if metadata.txt exists in the root (single plugin repo)
+        root_metadata_path = os.path.join(temp_dir, 'metadata.txt')
+        if os.path.exists(root_metadata_path):
+            logger.info(f"Found metadata.txt in root - treating as single plugin repository")
+            return temp_dir
+            
+        # If not, check for subdirectories containing metadata.txt
+        logger.info(f"No metadata.txt in root - looking for plugins in subdirectories")
+        plugin_dirs = []
+        
+        for item in os.listdir(temp_dir):
+            item_path = os.path.join(temp_dir, item)
+            metadata_path = os.path.join(item_path, 'metadata.txt')
+            
+            if os.path.isdir(item_path) and os.path.exists(metadata_path):
+                logger.info(f"Found plugin in subdirectory: {item}")
+                plugin_dirs.append(item)
+                
+                # If the directory name exactly matches the plugin name, return it immediately
+                if item == plugin_name:
+                    logger.info(f"Exact match found for plugin: {plugin_name}")
+                    return item_path
+        
+        # If we have plugin directories but no exact match, log what we found
+        if plugin_dirs:
+            logger.info(f"Found {len(plugin_dirs)} plugins in repository: {', '.join(plugin_dirs)}")
+            logger.warning(f"No subdirectory matching plugin name '{plugin_name}' exactly")
+            
+            # Try to find a case-insensitive match
+            for item in plugin_dirs:
+                if item.lower() == plugin_name.lower():
+                    logger.info(f"Found case-insensitive match: {item}")
+                    return os.path.join(temp_dir, item)
+        
+        # Default to the repo root if we can't find a match
+        logger.warning(f"No matching plugin directory found for '{plugin_name}' - using repository root")
+        return temp_dir
         
     def get_remote_version(self, repo_url, plugin_path, username=None, token=None):
         """Check if a plugin has updates available
@@ -182,20 +230,48 @@ class GitSync:
             token (str): GitHub token or password for authentication
             
         Returns:
-            tuple: (has_updates, remote_version)
+            str: Remote version if found, None otherwise
         """
+        # Get the plugin name from the path
+        plugin_name = os.path.basename(plugin_path)
+        logger.info(f"Getting remote version for plugin: {plugin_name}")
+        
         # Clone the repository with authentication if provided
         temp_dir = self.clone_repository(repo_url, username=username, token=token)
         
+        # Check if this is a single-plugin or multi-plugin repository
+        root_metadata_path = os.path.join(temp_dir, 'metadata.txt')
+        
+        if os.path.exists(root_metadata_path):
+            # Single plugin in repo root
+            logger.info(f"Found metadata.txt in repository root - single plugin repository")
+            metadata_path = root_metadata_path
+        else:
+            # Look for plugin in subdirectories
+            logger.info(f"No metadata.txt in root - looking for plugin in subdirectories")
+            
+            # Check for subdirectory matching plugin name
+            subdir_metadata_path = os.path.join(temp_dir, plugin_name, 'metadata.txt')
+            if os.path.exists(subdir_metadata_path):
+                logger.info(f"Found matching subdirectory for {plugin_name}")
+                metadata_path = subdir_metadata_path
+            else:
+                logger.warning(f"No matching subdirectory for {plugin_name} - plugin may not exist in repo")
+                return None
+        
+        logger.info(f"Looking for metadata at: {metadata_path}")
+        
         # Read remote version from metadata.txt
-        metadata_path = os.path.join(temp_dir, 'metadata.txt')
         if os.path.exists(metadata_path):
             with open(metadata_path, 'r') as f:
                 for line in f:
                     if line.startswith('version='):
                         remote_version = line.strip().split('=')[1]
+                        logger.info(f"Found remote version: {remote_version}")
                         return remote_version
-                        
+        else:
+            logger.warning(f"Metadata file not found at: {metadata_path}")
+        
         return None
         
     def update_plugin(self, repo_url, plugin_path, username=None, token=None):
@@ -208,34 +284,53 @@ class GitSync:
             token (str): GitHub token or password for authentication
         """
         try:
-            logger.info(f"Starting update of plugin: {plugin_path}")
+            # Get the plugin name from the path
+            plugin_name = os.path.basename(plugin_path)
+            logger.info(f"Starting update of plugin: {plugin_name} at {plugin_path}")
             logger.info(f"From repo: {repo_url}")
             
             # Clone the repository with authentication
             temp_dir = self.clone_repository(repo_url, username=username, token=token)
             logger.info(f"Cloned to temp dir: {temp_dir}")
             
-            # Check if temp_dir actually contains any files
-            if not os.path.exists(temp_dir) or not os.listdir(temp_dir):
-                raise Exception(f"Temp directory is empty or doesn't exist: {temp_dir}")
+            # Check if this is a single-plugin or multi-plugin repository
+            root_metadata_path = os.path.join(temp_dir, 'metadata.txt')
             
-            # IMPORTANT: Completely remove the old plugin directory first
+            if os.path.exists(root_metadata_path):
+                # Single plugin in repo root - use entire repo content
+                logger.info(f"Found metadata.txt in repository root - using entire repository")
+                source_dir = temp_dir
+            else:
+                # Look for plugin in subdirectories
+                logger.info(f"No metadata.txt in root - looking for plugin in subdirectories")
+                
+                # Check for subdirectory matching plugin name
+                subdir_path = os.path.join(temp_dir, plugin_name)
+                if os.path.exists(os.path.join(subdir_path, 'metadata.txt')):
+                    logger.info(f"Found matching subdirectory for {plugin_name}")
+                    source_dir = subdir_path
+                else:
+                    # If explicit match not found, raise exception
+                    logger.error(f"No matching subdirectory for {plugin_name} in repository")
+                    raise Exception(f"Plugin {plugin_name} not found in repository structure")
+            
+            logger.info(f"Using source directory: {source_dir}")
+            
+            # IMPORTANT: Remove the old plugin directory first
             logger.info(f"Removing old plugin at: {plugin_path}")
-            
-            # Handle removal with special care for .git directories
             self._safe_remove_directory(plugin_path)
             
             # Create the plugin directory again
             os.makedirs(plugin_path, exist_ok=True)
             
-            # Copy files from the repository to the plugin directory
-            logger.info(f"Copying new plugin files from {temp_dir} to {plugin_path}")
+            # Copy files from the source directory to the plugin directory
+            logger.info(f"Copying new plugin files from {source_dir} to {plugin_path}")
             files_copied = 0
-            for item in os.listdir(temp_dir):
+            for item in os.listdir(source_dir):
                 if item == '.git':
                     continue
                     
-                source = os.path.join(temp_dir, item)
+                source = os.path.join(source_dir, item)
                 dest = os.path.join(plugin_path, item)
                 
                 if os.path.isdir(source):
