@@ -2,26 +2,19 @@
 name=Git4QGIS
 qgisMinimumVersion=3.0
 description=Automatically sync QGIS plugins with GitHub repositories
-version=0.2.0
-author=Your Name
-email=your.email@example.com
+version=0.1.0
+author=Jesper Fjellin
+email=jesperfjellin@gmail.com
 
 about=This plugin allows you to automatically sync other defined QGIS plugins against Github repositories.
 
 tracker=https://github.com/yourusername/Git4QGIS/issues
 repository=https://github.com/yourusername/Git4QGIS
 
-# End of mandatory metadata
-
-# Recommended items:
-hasProcessingProvider=no
-# Uncomment the following line and add your changelog:
-# changelog=
-
 # Tags are comma separated with spaces allowed
 tags=github,git,version control,plugin,developer
 
-homepage=https://github.com/yourusername/Git4QGIS
+homepage=https://github.com/jesperfjellin/Git4QGIS
 category=Plugins
 icon=icon.png
 
@@ -30,14 +23,3 @@ experimental=True
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False
-
-# Since QGIS 3.8, a comma separated list of plugins to be installed
-# (or upgraded) can be specified.
-# Check the documentation for more information.
-# plugin_dependencies=
-
-# Category of the plugin: Raster, Vector, Database or Web
-# category=Web
-
-# If the plugin can run on QGIS Server.
-server=False
